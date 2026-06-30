@@ -77,7 +77,7 @@ Applies migrations, seeds demo orders (when table is empty), rebuilds all read m
 ./scripts/deploy.sh
 ```
 
-Builds the Docker image, pushes to Artifact Registry, and updates Cloud Run via Terraform.
+Detects GCP project, region, and Artifact Registry repo from `gcloud` config (seeded from `.env.gcp` if present). Prompts to confirm or override each, then builds, pushes, and deploys via Terraform. Prints the Cloud Run URL when done.
 
 ### 4. Start with Cloud SQL Auth Proxy (non-Cloud Run)
 
