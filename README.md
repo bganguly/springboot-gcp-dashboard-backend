@@ -38,36 +38,38 @@ Expected timing:
 
 ### 2. Prepare demo data
 
+**Fastest — in-region from GCP Cloud Shell** (avoids local network entirely; run from Cloud Shell in the same region as Cloud SQL):
+
+```bash
+sudo apt-get install -y postgresql-client-15
+export DATABASE_URL='<paste from ./scripts/database-url.sh on your local terminal>'
+export BUCKET=<your-private-bucket>
+
+# bake a snapshot
+pg_dump --format=custom --no-owner --no-privileges "$DATABASE_URL" \
+  | gsutil cp - "gs://$BUCKET/dash/demo.dump"
+
+# restore (destructive — drops and recreates objects)
+gsutil cp "gs://$BUCKET/dash/demo.dump" ~/demo.dump
+pg_restore --no-owner --no-privileges --clean --if-exists --jobs 4 \
+  --dbname "$DATABASE_URL" ~/demo.dump && rm -f ~/demo.dump
+```
+
+**Fast — restore from a GCS snapshot** (maintainer only; falls back to full seed automatically if unset or inaccessible):
+
+```bash
+source .env.gcp
+DEMO_SNAPSHOT_GCS_URI=gs://<bucket>/dash/demo.dump ./scripts/prepare-demo-data.sh
+```
+
+**Fallback — full seed** (runs automatically when no snapshot is available; 15–25 min on `db-f1-micro`):
+
 ```bash
 source .env.gcp
 ./scripts/prepare-demo-data.sh
 ```
 
-Applies migrations, seeds demo orders (when table is empty), rebuilds all read model rollups. Prints elapsed time and row counts per phase.
-
-Expected timing on `db-f1-micro`: 15–25 minutes for the 4 M order seed.
-
-**Faster alternatives:**
-
-- **GCS snapshot (maintainer only)** — set `DEMO_SNAPSHOT_GCS_URI=gs://<bucket>/dash/demo.dump` before running; the script restores from the snapshot instead of seeding. Falls back to full seed automatically if the URI is unset or inaccessible.
-
-- **In-region from Cloud Shell** (fastest — avoids local network) — run from GCP Cloud Shell in the same region as Cloud SQL:
-
-  ```bash
-  sudo apt-get install -y postgresql-client-15
-  export DATABASE_URL='<paste from ./scripts/database-url.sh>'
-  export BUCKET=<your-private-bucket>
-
-  # bake
-  pg_dump --format=custom --no-owner --no-privileges "$DATABASE_URL" \
-    | gsutil cp - "gs://$BUCKET/dash/demo.dump"
-
-  # restore (destructive — drops and recreates objects)
-  gsutil cp "gs://$BUCKET/dash/demo.dump" ~/demo.dump
-  pg_restore --no-owner --no-privileges --clean --if-exists --jobs 4 \
-    --dbname "$DATABASE_URL" ~/demo.dump
-  rm -f ~/demo.dump
-  ```
+Applies migrations, seeds demo orders (when table is empty), rebuilds all read model rollups, and prints elapsed time and row counts per phase.
 
 ### 3. Deploy backend
 
