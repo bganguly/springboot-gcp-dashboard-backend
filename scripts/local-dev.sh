@@ -34,7 +34,14 @@ ok "gradle" "$(gradle --version 2>/dev/null | grep '^Gradle ' | head -1)"
 command -v psql >/dev/null 2>&1 || fail "psql not found — install Postgres (brew install postgresql@15)"
 ok "psql" "$(psql --version)"
 
-pg_isready >/dev/null 2>&1 || fail "Postgres is not running — start it first (brew services start postgresql@15)"
+if ! pg_isready >/dev/null 2>&1; then
+  printf '  postgres: not running — starting...\n'
+  if command -v brew >/dev/null 2>&1; then
+    brew services start postgresql@15 2>/dev/null || brew services start postgresql 2>/dev/null || true
+    sleep 2
+  fi
+  pg_isready >/dev/null 2>&1 || fail "Postgres did not start. Install: brew install postgresql@15"
+fi
 ok "postgres" "ready"
 
 # ── gradle wrapper ────────────────────────────────────────────────────────────

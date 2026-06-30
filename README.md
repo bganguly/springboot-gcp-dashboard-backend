@@ -28,12 +28,7 @@ Checks prerequisites, creates and seeds the database if needed (prompts before a
   sdk install gradle
   ```
 
-- **Postgres** running locally:
-
-  ```bash
-  brew install postgresql@15
-  brew services start postgresql@15
-  ```
+- **Postgres** installed locally (`brew install postgresql@15`) — `local-dev.sh` starts it automatically if needed
 
 ---
 
