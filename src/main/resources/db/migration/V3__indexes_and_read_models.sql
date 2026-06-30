@@ -3,12 +3,11 @@
 -- and pg_trgm-backed text search.
 --
 -- NOTE: this migration uses plain (non-CONCURRENT) CREATE INDEX so it is
--- transaction-safe for `prisma migrate deploy`. On a large, live table the
--- non-concurrent build takes a brief write lock. To add these to an already-
--- populated production DB without locking, run prisma/sql/search-indexes.sql
--- (CREATE INDEX CONCURRENTLY) instead, outside a transaction.
+-- transaction-safe for Flyway. On a large, live table the non-concurrent build
+-- takes a brief write lock. To add these to an already-populated production DB
+-- without locking, use CREATE INDEX CONCURRENTLY outside a transaction.
 
--- B-tree indexes (also declared in schema.prisma via @@index).
+-- B-tree indexes.
 CREATE INDEX IF NOT EXISTS "orders_total_idx" ON "orders" ("total");
 CREATE INDEX IF NOT EXISTS "customers_lastName_idx" ON "customers" ("lastName");
 

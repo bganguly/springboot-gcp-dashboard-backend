@@ -33,6 +33,6 @@ if [[ -z "${DATABASE_URL:-}" ]]; then
 fi
 
 export DATABASE_URL
-echo "[start] DATABASE_URL ready; starting dashboard on :3004"
+echo "[start] DATABASE_URL ready; starting backend on :8080"
 cd "$ROOT_DIR"
-npm run dev
+./gradlew bootRun

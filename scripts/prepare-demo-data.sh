@@ -77,11 +77,10 @@ apply_dashboard_sql_migrations() {
   while IFS= read -r migration; do
     printf '    applying %s\n' "${migration#"$ROOT_DIR"/}"
     psql_retry -v ON_ERROR_STOP=1 -f "$migration"
-  done < <(find "$ROOT_DIR/prisma/migrations" -maxdepth 2 -name migration.sql -print | sort)
+  done < <(find "$ROOT_DIR/src/main/resources/db/migration" -maxdepth 1 -name "V*.sql" -print | sort)
 }
 
 # Resolve DATABASE_URL from Cloud SQL Auth Proxy tunnel or environment.
-# For local dev use LOCAL_DB_URL from docker-compose (see local-dev.sh).
 if [[ -z "${DATABASE_URL:-}" ]]; then
   if DATABASE_URL="$("$ROOT_DIR/scripts/database-url.sh" 2>/dev/null)"; then
     echo "[prepare] Using DATABASE_URL from terraform output (needs Cloud SQL Auth Proxy or private network)."
@@ -99,8 +98,8 @@ if restore_from_snapshot; then
   exit 0
 fi
 
-step "1/5 Applying Prisma schema." "< 1 min"
-npx prisma db push
+step "1/5 Applying Flyway migrations." "< 1 min"
+apply_dashboard_sql_migrations
 step_done
 
 step "2/5 Checking demo order volume." "< 10 sec"
