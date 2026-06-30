@@ -12,8 +12,6 @@ Sister repo: [dashboard-frontend](https://github.com/bganguly/dashboard-frontend
 
 Checks prerequisites, creates and seeds the database if needed (prompts before any writes), runs diagnostics, then starts on http://localhost:8080.
 
-Set `ORDERS=N` to seed a different row count (default 100 k; production uses 4 M).
-
 ### Prerequisites
 
 - **Java 21** — install via [SDKMAN](https://sdkman.io/) (workaround for older Macs: `brew install java` can trigger a 30–60 min source build):
