@@ -2,7 +2,7 @@
 
 Spring Boot 4 / Java 21 backend for the orders dashboard. Postgres via Flyway migrations, deployed to Cloud Run backed by Cloud SQL.
 
-Sister repos: [dashboard-frontend](https://github.com/bganguly/dashboard-frontend) · [typescript-implementations](https://github.com/bganguly/typescript-implementations) (Next.js + AWS variant).
+Sister repo: [dashboard-frontend](https://github.com/bganguly/dashboard-frontend)
 
 ## Local Dev
 
@@ -19,40 +19,28 @@ sdk install gradle
 
 - Postgres running locally
 
-### 1. Generate the Gradle wrapper
+### Quick Start (first time)
 
 ```bash
+# 1. Generate the Gradle wrapper
 gradle wrapper
-```
 
-### 2. Seed the database
-
-```bash
+# 2. Create and seed the database (100 k rows; default is 4 M, too slow locally)
 createdb dashboard_perf
 psql -d dashboard_perf -f src/main/resources/db/migration/V1__initial_schema.sql
 psql -d dashboard_perf -f src/main/resources/db/migration/V2__daily_summary.sql
 psql -d dashboard_perf -f src/main/resources/db/migration/V3__indexes_and_read_models.sql
 psql -d dashboard_perf -v orders=100000 -f scripts/seed-large.sql
 psql -d dashboard_perf -f scripts/rebuild-dashboard-read-models.sql
-```
 
-`seed-large.sql` accepts an `orders` variable (defaults to 4 M; use 100 k locally for speed).
+# 3. Verify — prints Java version, Postgres readiness, row counts, Flyway state
+DATABASE_URL="jdbc:postgresql://localhost:5432/dashboard_perf?user=$(whoami)" ./scripts/diagnose.sh
 
-### 3. Start the backend
-
-```bash
+# 4. Start
 DATABASE_URL="jdbc:postgresql://localhost:5432/dashboard_perf?user=$(whoami)" ./gradlew bootRun
 ```
 
 Listens on http://localhost:8080. The frontend proxies `/api/*` here in dev.
-
-### Diagnostics
-
-```bash
-DATABASE_URL="jdbc:postgresql://localhost:5432/dashboard_perf?user=$(whoami)" ./scripts/diagnose.sh
-```
-
-Prints Java version, Postgres readiness, table row counts, date ranges, Flyway history, and startup errors in one shot.
 
 ---
 
