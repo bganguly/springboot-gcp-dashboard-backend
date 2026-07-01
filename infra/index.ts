@@ -13,7 +13,6 @@ const dbUsername    = config.get("dbUsername")       ?? "appuser";
 const dbTier        = config.get("dbTier")           ?? "db-custom-4-16384";
 const dbDiskGb      = config.getNumber("dbDiskGb")   ?? 35;
 const backendImage  = config.get("backendImage")     ?? "";
-const frontendImage = config.get("frontendImage")    ?? "";
 
 // ── APIs ──────────────────────────────────────────────────────────────────────
 const apis = [
@@ -203,38 +202,10 @@ new gcp.cloudrunv2.ServiceIamMember("backend-public", {
   member: "allUsers",
 });
 
-// ── Cloud Run: Frontend ───────────────────────────────────────────────────────
-const frontendService = new gcp.cloudrunv2.Service("frontend", {
-  name: `${namePrefix}-frontend`,
-  location: region,
-  template: {
-    containers: [{
-      image: frontendImage !== "" ? frontendImage : "us-docker.pkg.dev/cloudrun/container/hello",
-      ports: [{ containerPort: 80 }],
-      resources: { limits: { cpu: "1", memory: "512Mi" } },
-      envs: [{
-        name: "BACKEND_URL",
-        value: backendService.uri,
-      }],
-    }],
-    scaling: { minInstanceCount: 0, maxInstanceCount: 3 },
-  },
-  traffics: [{ type: "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST", percent: 100 }],
-}, { dependsOn: [backendService] });
-
-new gcp.cloudrunv2.ServiceIamMember("frontend-public", {
-  project,
-  location: region,
-  name: frontendService.name,
-  role: "roles/run.invoker",
-  member: "allUsers",
-});
-
 // ── Outputs ───────────────────────────────────────────────────────────────────
 export const cloudSqlInstance  = dbInstance.connectionName;
 export const artifactRegistry  = pulumi.interpolate`${region}-docker.pkg.dev/${project}/${registry.repositoryId}`;
 export const backendUrl        = backendService.uri;
-export const frontendUrl       = frontendService.uri;
 export const databaseUrl       = pulumi.secret(
   pulumi.interpolate`postgresql://${dbUsername}:${dbPassword.result}@${dbInstance.privateIpAddress}:5432/${dbName}`
 );
