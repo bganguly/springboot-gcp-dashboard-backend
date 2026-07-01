@@ -1,0 +1,6 @@
+name: dashboard
+runtime:
+  name: nodejs
+  options:
+    typescript: true
+description: Dashboard backend + frontend on GCP Cloud Run + Cloud SQL

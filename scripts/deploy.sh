@@ -149,10 +149,9 @@ docker build --platform linux/amd64 -t "$IMAGE" "$ROOT_DIR"
 printf '[3/3] pushing image...\n'
 docker push "$IMAGE"
 
-# ── application default credentials (required by Terraform) ───────────────────
+# ── application default credentials (required by Pulumi GCP provider) ─────────
 if ! gcloud auth application-default print-access-token >/dev/null 2>&1; then
-  printf '\nTerraform requires Application Default Credentials (separate from gcloud login).\n'
-  printf 'Set them up now? [y/N] '
+  printf '\nApplication Default Credentials needed for the GCP provider. Set up now? [y/N] '
   read -r do_adc
   if [[ "$do_adc" =~ ^[Yy]$ ]]; then
     gcloud auth application-default login
@@ -161,18 +160,19 @@ if ! gcloud auth application-default print-access-token >/dev/null 2>&1; then
   fi
 fi
 
-# ── deploy via terraform ──────────────────────────────────────────────────────
-printf '\n=== deploying via Terraform ===\n'
+# ── deploy via pulumi ─────────────────────────────────────────────────────────
+printf '\n=== deploying via Pulumi ===\n'
 cd "$ROOT_DIR/infra"
-terraform apply \
-  -var="gcp_project=${GCP_PROJECT}" \
-  -var="gcp_region=${GCP_REGION}" \
-  -var="backend_image=${IMAGE}" \
-  -input=false -auto-approve
+npm install --prefer-offline 2>/dev/null || npm install
+pulumi stack select "dev" 2>/dev/null || pulumi stack init "dev"
+pulumi config set gcp:project "$GCP_PROJECT"
+pulumi config set gcp:region  "$GCP_REGION"
+pulumi config set backendImage "$IMAGE"
+pulumi up --yes
 
 printf '\nDone. Backend URL:\n  '
-terraform output -raw backend_url 2>/dev/null || \
-  gcloud run services describe dashboard-backend \
+pulumi stack output backendUrl 2>/dev/null || \
+  gcloud run services describe dash-backend \
     --region "$GCP_REGION" --project "$GCP_PROJECT" \
     --format="value(status.url)" 2>/dev/null || true
 
