@@ -17,11 +17,19 @@ ask() {
   echo "${input:-$default}"
 }
 
-# ── gcloud auth check ─────────────────────────────────────────────────────────
+# ── gcloud install + auth check ───────────────────────────────────────────────
 if ! command -v gcloud >/dev/null 2>&1; then
   printf '\ngcloud CLI not found.\n'
-  printf '  Install: https://cloud.google.com/sdk/docs/install\n'
-  exit 1
+  if command -v brew >/dev/null 2>&1; then
+    printf 'Installing via Homebrew...\n'
+    brew install --cask google-cloud-sdk
+    # shellcheck source=/dev/null
+    source "$(brew --prefix)/share/google-cloud-sdk/path.bash.inc" 2>/dev/null || true
+  else
+    printf 'Install it from: https://cloud.google.com/sdk/docs/install\n'
+    printf 'Then re-run this script.\n'
+    exit 1
+  fi
 fi
 
 ACTIVE_ACCOUNT=$(gcloud auth list --filter=status:ACTIVE --format="value(account)" 2>/dev/null | head -1 || true)
