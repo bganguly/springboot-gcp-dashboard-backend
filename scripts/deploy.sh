@@ -149,6 +149,18 @@ docker build --platform linux/amd64 -t "$IMAGE" "$ROOT_DIR"
 printf '[3/3] pushing image...\n'
 docker push "$IMAGE"
 
+# ── application default credentials (required by Terraform) ───────────────────
+if ! gcloud auth application-default print-access-token >/dev/null 2>&1; then
+  printf '\nTerraform requires Application Default Credentials (separate from gcloud login).\n'
+  printf 'Set them up now? [y/N] '
+  read -r do_adc
+  if [[ "$do_adc" =~ ^[Yy]$ ]]; then
+    gcloud auth application-default login
+  else
+    printf 'Run: gcloud auth application-default login\n'; exit 1
+  fi
+fi
+
 # ── deploy via terraform ──────────────────────────────────────────────────────
 printf '\n=== deploying via Terraform ===\n'
 cd "$ROOT_DIR/infra"
