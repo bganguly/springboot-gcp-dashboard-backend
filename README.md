@@ -8,9 +8,7 @@ Sister repo: [dashboard-frontend](https://github.com/bganguly/dashboard-frontend
 
 ---
 
-## CVS JD Alignment
-
-| JD Requirement | This Project |
+| | |
 |---|---|
 | **Java / Spring Boot back-end** | Spring Boot 4, Java 21, NamedParameterJdbcTemplate, Flyway |
 | **React / TypeScript front-end** | [dashboard-frontend](https://github.com/bganguly/dashboard-frontend) — React 19, TypeScript, Vite |
