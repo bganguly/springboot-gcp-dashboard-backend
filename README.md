@@ -62,12 +62,6 @@ Prerequisites checked automatically:
 Detects GCP project, region, and Artifact Registry from `gcloud` config. Builds the Docker image,
 pushes to Artifact Registry, runs `pulumi up --yes`. Prints the Cloud Run URL on completion.
 
-To bring up infra and seed data first:
-
-```bash
-GCP_PROJECT=your-project-id ./scripts/infra-up.sh
-```
-
 ---
 
 ## Live Service
@@ -101,7 +95,7 @@ curl "$BASE/api/aggregates?from=2024-01-01&to=2024-12-31" | jq 'length'
 ## Tear Down
 
 ```bash
-GCP_PROJECT=your-project-id ./scripts/infra-down.sh
+./scripts/infra-down.sh
 ```
 
 Runs `pulumi destroy --yes` then removes `.env.gcp`. Destroys all GCP resources — Cloud Run services,
