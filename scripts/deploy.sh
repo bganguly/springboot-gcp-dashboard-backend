@@ -9,10 +9,10 @@ ENV_FILE="$ROOT_DIR/.env.gcp"
 # ── helpers ───────────────────────────────────────────────────────────────────
 ask() {
   local label="$1" hint="$2" default="$3"
-  printf '\n  %s\n' "$label"
-  [[ -n "$hint"    ]] && printf '  → %s\n' "$hint"
-  [[ -n "$default" ]] && printf '  [detected: %s]\n' "$default"
-  printf '  > '
+  printf '\n  %s\n' "$label" >&2
+  [[ -n "$hint"    ]] && printf '  → %s\n' "$hint" >&2
+  [[ -n "$default" ]] && printf '  [detected: %s]\n' "$default" >&2
+  printf '  > ' >&2
   read -r input
   echo "${input:-$default}"
 }
