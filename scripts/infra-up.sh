@@ -10,6 +10,7 @@ ENV_FILE="$ROOT_DIR/.env.gcp"
 
 step() { printf '\n[infra-up] %s\n' "$1"; }
 
+# ── terraform ─────────────────────────────────────────────────────────────────
 cd "$INFRA_DIR"
 
 step "terraform init"
@@ -35,10 +36,47 @@ GCP_PROJECT=${GCP_PROJECT}
 GCP_REGION=${GCP_REGION}
 EOF
 
-echo ""
-echo "Infra ready."
-echo "  Cloud SQL instance : ${INSTANCE}"
-echo "  Artifact Registry  : ${REGISTRY}"
-echo "  Cloud Run URL      : ${RUN_URL}"
-echo ""
-echo "Next: ./scripts/prepare-demo-data.sh"
+printf '\nInfra ready.\n'
+printf '  Cloud SQL instance : %s\n' "$INSTANCE"
+printf '  Artifact Registry  : %s\n' "$REGISTRY"
+printf '  Cloud Run URL      : %s\n' "$RUN_URL"
+
+# ── demo data ─────────────────────────────────────────────────────────────────
+source "$ENV_FILE"
+
+if [[ -n "${DEMO_SNAPSHOT_GCS_URI:-}" ]]; then
+  printf '\nDEMO_SNAPSHOT_GCS_URI is set — restoring from snapshot...\n'
+  DEMO_SNAPSHOT_GCS_URI="$DEMO_SNAPSHOT_GCS_URI" "$ROOT_DIR/scripts/prepare-demo-data.sh"
+else
+  printf '\n=== demo data ===\n'
+  printf 'How would you like to populate the database?\n\n'
+  printf '  1) In-region from Cloud Shell (fastest — avoids local network)\n'
+  printf '  2) Full seed via prepare-demo-data.sh (15-25 min on db-f1-micro)\n'
+  printf '  3) Skip — I will run prepare-demo-data.sh manually\n'
+  printf '\nChoice [1/2/3]: '
+  read -r choice
+
+  case "$choice" in
+    1)
+      DB_URL=$("$ROOT_DIR/scripts/database-url.sh" 2>/dev/null || echo '<run ./scripts/database-url.sh>')
+      printf '\nRun the following from GCP Cloud Shell in region %s:\n\n' "$GCP_REGION"
+      printf '  sudo apt-get install -y postgresql-client-15\n'
+      printf '  export DATABASE_URL='"'"'%s'"'"'\n' "$DB_URL"
+      printf '  export BUCKET=<your-private-bucket>\n\n'
+      printf '  # bake a snapshot\n'
+      printf '  pg_dump --format=custom --no-owner --no-privileges "$DATABASE_URL" \\\n'
+      printf '    | gsutil cp - "gs://$BUCKET/dash/demo.dump"\n\n'
+      printf '  # restore (destructive)\n'
+      printf '  gsutil cp "gs://$BUCKET/dash/demo.dump" ~/demo.dump\n'
+      printf '  pg_restore --no-owner --no-privileges --clean --if-exists --jobs 4 \\\n'
+      printf '    --dbname "$DATABASE_URL" ~/demo.dump && rm -f ~/demo.dump\n\n'
+      printf 'Or re-run with DEMO_SNAPSHOT_GCS_URI=gs://<bucket>/dash/demo.dump to restore automatically.\n'
+      ;;
+    2)
+      "$ROOT_DIR/scripts/prepare-demo-data.sh"
+      ;;
+    *)
+      printf '\nSkipped. Run ./scripts/prepare-demo-data.sh when ready.\n'
+      ;;
+  esac
+fi
