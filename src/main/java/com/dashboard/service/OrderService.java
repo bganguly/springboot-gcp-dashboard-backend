@@ -47,7 +47,8 @@ public class OrderService {
         var where = buildWhere(q, status, regionCode, from, to, minTotal, maxTotal, params);
 
         String countSql = ctePrefix + "SELECT COUNT(*) FROM orders o " +
-                "JOIN customers c ON c.id = o.\"customerId\" " + where;
+                "JOIN customers c ON c.id = o.\"customerId\" " +
+                "JOIN regions r ON r.id = o.\"regionId\" " + where;
         long total = Objects.requireNonNull(jdbc.queryForObject(countSql, params, Long.class));
         boolean approximate = false;
 

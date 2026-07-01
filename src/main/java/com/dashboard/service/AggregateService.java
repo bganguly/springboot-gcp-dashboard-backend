@@ -31,9 +31,6 @@ public class AggregateService {
 
         if (!hasQ && !hasStatus && !hasRegion && !hasTotal) {
             rows = queryDailySummary(from, to, regionCode);
-        } else if (hasQ && isMultiToken && !hasTotal) {
-            rows = queryMultiTokenViaCte(from, to, q, status, regionCode);
-            if (rows.isEmpty()) rows = queryViaSearchText(from, to, q, status, regionCode, minTotal, maxTotal);
         } else if (hasQ && isMultiToken) {
             rows = queryViaSearchText(from, to, q, status, regionCode, minTotal, maxTotal);
         } else if (hasQ && !hasStatus && !hasRegion && !hasTotal) {
