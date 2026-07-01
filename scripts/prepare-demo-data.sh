@@ -80,12 +80,12 @@ apply_dashboard_sql_migrations() {
   done < <(find "$ROOT_DIR/src/main/resources/db/migration" -maxdepth 1 -name "V*.sql" -print | sort)
 }
 
-# Resolve DATABASE_URL from Cloud SQL Auth Proxy tunnel or environment.
+# Resolve DATABASE_URL from Pulumi stack output or environment.
 if [[ -z "${DATABASE_URL:-}" ]]; then
   if DATABASE_URL="$("$ROOT_DIR/scripts/database-url.sh" 2>/dev/null)"; then
-    echo "[prepare] Using DATABASE_URL from terraform output (needs Cloud SQL Auth Proxy or private network)."
+    echo "[prepare] Using DATABASE_URL from Pulumi stack output (needs Cloud SQL Auth Proxy or private network)."
   else
-    echo "DATABASE_URL is not set and terraform output is unavailable." >&2
+    echo "DATABASE_URL is not set and could not be resolved from Pulumi." >&2
     echo "Run ./scripts/infra-up.sh first, or set DATABASE_URL manually." >&2
     exit 1
   fi

@@ -201,3 +201,6 @@ export const cloudSqlInstance  = dbInstance.connectionName;
 export const artifactRegistry  = pulumi.interpolate`${region}-docker.pkg.dev/${project}/${registry.repositoryId}`;
 export const backendUrl        = backendService.uri;
 export const frontendUrl       = frontendService.uri;
+export const databaseUrl       = pulumi.secret(
+  pulumi.interpolate`postgresql://${dbUsername}:${dbPassword.result}@${dbInstance.privateIpAddress}:5432/${dbName}`
+);

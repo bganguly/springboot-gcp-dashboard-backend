@@ -32,7 +32,7 @@ Checks prerequisites, creates and seeds the database if needed (prompts before a
 ./scripts/deploy.sh
 ```
 
-Detects GCP project, region, and Artifact Registry repo from `gcloud` config. Prompts to confirm or override, then builds, pushes, and deploys via Terraform. If infra is not yet up, offers to run `infra-up.sh` first (which also handles demo data seeding). Prints the Cloud Run URL and a reminder to tear down when done.
+Detects GCP project, region, and Artifact Registry repo from `gcloud` config. Prompts to confirm or override, then builds, pushes, and deploys via Pulumi. If infra is not yet up, offers to run `infra-up.sh` first (which also handles demo data seeding). Prints the Cloud Run URL and a reminder to tear down when done.
 
 To bring up infra and seed data independently (without deploying): `GCP_PROJECT=your-project-id ./scripts/infra-up.sh`
 
