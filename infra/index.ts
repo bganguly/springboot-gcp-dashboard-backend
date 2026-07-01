@@ -104,7 +104,10 @@ const dbInstance = new gcp.sql.DatabaseInstance("pg", {
     backupConfiguration: { enabled: true },
   },
   deletionProtection: false,
-}, { dependsOn: [privateVpc] });
+}, {
+  dependsOn: [privateVpc],
+  ignoreChanges: ["settings.diskSize"],  // diskAutoresize grows disk; never try to shrink
+});
 
 new gcp.sql.Database("app-db", {
   name: dbName,
@@ -123,10 +126,10 @@ const dbUrlSecret = new gcp.secretmanager.Secret("database-url", {
   replication: { auto: {} },
 }, { dependsOn: apis });
 
-new gcp.secretmanager.SecretVersion("database-url-v1", {
+const dbUrlSecretVersion = new gcp.secretmanager.SecretVersion("database-url-v1", {
   secret: dbUrlSecret.id,
   secretData: pulumi.interpolate`postgresql://${dbUsername}:${dbPassword.result}@${dbInstance.privateIpAddress}:5432/${dbName}`,
-});
+}, { retainOnDelete: true });
 
 // ── Artifact Registry ─────────────────────────────────────────────────────────
 const registry = new gcp.artifactregistry.Repository("repo", {
@@ -182,7 +185,7 @@ const backendService = new gcp.cloudrunv2.Service("backend", {
         valueSource: {
           secretKeyRef: {
             secret: dbUrlSecret.secretId,
-            version: "latest",
+            version: dbUrlSecretVersion.version,
           },
         },
       }],
