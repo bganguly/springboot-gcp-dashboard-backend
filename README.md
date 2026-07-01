@@ -25,15 +25,6 @@ Sister repo: [dashboard-frontend](https://github.com/bganguly/dashboard-frontend
 
 ---
 
-## Tech Stack
-
-**Backend:** Java 21, Spring Boot 4, Spring JDBC, Flyway, Lombok  
-**Database:** Cloud SQL PostgreSQL 16 — GIN trigram indexes, pre-aggregated summary tables, trigger-maintained `search_text` column  
-**Cloud:** GCP Cloud Run (serverless), Cloud SQL, Secret Manager, Artifact Registry, VPC, Direct VPC Egress  
-**IaC:** Pulumi TypeScript  
-**Build:** Gradle, Docker (multi-stage), `deploy.sh`
-
----
 
 ## Scale & Performance
 
