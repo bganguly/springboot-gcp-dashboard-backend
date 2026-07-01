@@ -39,21 +39,27 @@ public class OrderService {
         page = Math.max(page, 1);
         int offset = (page - 1) * pageSize;
 
-        String safeSort = Set.of("placedAt", "total", "status").contains(sort) ? sort : "placedAt";
+        String safeSort = Set.of("placedAt", "total", "status", "customer", "id").contains(sort) ? sort : "placedAt";
         String safeDir = "asc".equalsIgnoreCase(dir) ? "ASC" : "DESC";
 
         var params = new MapSqlParameterSource();
+        String ctePrefix = buildSearchCte(q, params);
         var where = buildWhere(q, status, regionCode, from, to, minTotal, maxTotal, params);
 
-        String countSql = "SELECT COUNT(*) FROM orders o " +
+        String countSql = ctePrefix + "SELECT COUNT(*) FROM orders o " +
                 "JOIN customers c ON c.id = o.\"customerId\" " + where;
         long total = Objects.requireNonNull(jdbc.queryForObject(countSql, params, Long.class));
         boolean approximate = false;
 
         // Data page
-        String sortCol = "placedAt".equals(safeSort) ? "o.\"placedAt\""
-                : "total".equals(safeSort) ? "o.total" : "o.status";
-        String dataSql = """
+        String orderBy = switch (safeSort) {
+            case "customer" -> "c.\"firstName\" " + safeDir + ", c.\"lastName\" " + safeDir;
+            case "total"    -> "o.total " + safeDir;
+            case "status"   -> "o.status " + safeDir;
+            case "id"       -> "o.id " + safeDir;
+            default         -> "o.\"placedAt\" " + safeDir;
+        };
+        String dataSql = ctePrefix + """
                 SELECT o.id, o.status, o.total, o.currency, o.notes, o."placedAt",
                        c.id AS c_id, c.email, c."firstName", c."lastName", c.phone,
                        r.id AS r_id, r.code AS r_code, r.name AS r_name
@@ -61,7 +67,7 @@ public class OrderService {
                 JOIN customers c ON c.id = o."customerId"
                 JOIN regions r ON r.id = o."regionId"
                 """ + where +
-                " ORDER BY " + sortCol + " " + safeDir +
+                " ORDER BY " + orderBy +
                 " LIMIT :limit OFFSET :offset";
         params.addValue("limit", pageSize).addValue("offset", offset);
 
@@ -151,6 +157,10 @@ public class OrderService {
 
     // --- helpers ---
 
+    private String buildSearchCte(String q, MapSqlParameterSource params) {
+        return ""; // search_text column handles all search — no CTE needed
+    }
+
     private String buildWhere(String q, String status, String regionCode,
                                String from, String to,
                                BigDecimal minTotal, BigDecimal maxTotal,
@@ -158,8 +168,12 @@ public class OrderService {
         List<String> clauses = new ArrayList<>();
 
         if (q != null && !q.isBlank()) {
-            clauses.add("(c.\"firstName\" || ' ' || c.\"lastName\" || ' ' || c.email) ILIKE :q");
-            params.addValue("q", "%" + q.strip() + "%");
+            String[] tokens = q.strip().split("\\s+");
+            for (int i = 0; i < tokens.length; i++) {
+                String key = "q" + i;
+                clauses.add("o.search_text ILIKE :" + key);
+                params.addValue(key, "%" + tokens[i] + "%");
+            }
         }
         if (status != null && !status.isBlank()) {
             List<String> statuses = Arrays.stream(status.split(","))

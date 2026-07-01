@@ -31,6 +31,8 @@ public class AggregateService {
 
         if (!hasQ && !hasStatus && !hasRegion && !hasTotal) {
             rows = queryDailySummary(from, to, regionCode);
+        } else if (hasQ && isMultiToken && !hasTotal) {
+            rows = queryMultiTokenViaCte(from, to, q, status, regionCode);
         } else if (hasQ && isMultiToken) {
             rows = queryDirectIlike(from, to, q, status, regionCode, minTotal, maxTotal);
         } else if (hasQ && !hasStatus && !hasRegion && !hasTotal) {
@@ -142,6 +144,41 @@ public class AggregateService {
                 where + " GROUP BY date, \"categoryName\" ORDER BY date", params);
     }
 
+    private List<Map<String, Object>> queryMultiTokenViaCte(
+            String from, String to, String q,
+            String status, String regionCode) {
+        var params = new MapSqlParameterSource()
+                .addValue("from", from).addValue("to", to);
+        String[] tokens = q.strip().split("\\s+");
+        List<String> tokenClauses = new ArrayList<>();
+        for (int i = 0; i < tokens.length; i++) {
+            String key = "q" + i;
+            tokenClauses.add("(\"firstName\" || ' ' || \"lastName\") ILIKE :" + key);
+            params.addValue(key, "%" + tokens[i] + "%");
+        }
+        String customerWhere = String.join(" AND ", tokenClauses);
+        List<String> extra = new ArrayList<>();
+        if (status != null && !status.isBlank())
+            extra.add("dcs.status = ANY(ARRAY[" + quoteStatusList(status) + "])");
+        if (regionCode != null && !regionCode.isBlank())
+            extra.add("dcs.\"regionCode\" = ANY(ARRAY[" + quoteList(regionCode) + "])");
+        String extraWhere = extra.isEmpty() ? "" : " AND " + String.join(" AND ", extra);
+        return jdbc.queryForList(
+                "WITH matching_customers AS (" +
+                "  SELECT id FROM customers WHERE " + customerWhere +
+                ") " +
+                "SELECT dcs.date::text AS day, dcs.\"categoryName\" AS category, " +
+                "SUM(dcs.\"totalOrders\") AS total_orders, " +
+                "SUM(dcs.\"totalRevenue\") AS total_revenue, " +
+                "SUM(dcs.\"totalItems\") AS total_items " +
+                "FROM daily_customer_category_summary dcs " +
+                "WHERE dcs.\"customerId\" IN (SELECT id FROM matching_customers) " +
+                "AND dcs.date BETWEEN :from::date AND :to::date" +
+                extraWhere +
+                " GROUP BY dcs.date, dcs.\"categoryName\" ORDER BY dcs.date",
+                params);
+    }
+
     private List<Map<String, Object>> queryDirectIlike(
             String from, String to, String q,
             String status, String regionCode,
@@ -168,7 +205,7 @@ public class AggregateService {
                 "JOIN order_items oi ON oi.\"orderId\" = o.id " +
                 "JOIN products p ON p.id = oi.\"productId\" " +
                 "JOIN categories cat ON cat.id = p.\"categoryId\" " +
-                "WHERE (c.\"firstName\" || ' ' || c.\"lastName\" || ' ' || c.email) ILIKE :q " +
+                "WHERE (c.\"firstName\" || ' ' || c.\"lastName\") ILIKE :q " +
                 "AND o.\"placedAt\"::date BETWEEN :from::date AND :to::date" +
                 extraWhere +
                 " GROUP BY o.\"placedAt\"::date, cat.name ORDER BY o.\"placedAt\"::date",

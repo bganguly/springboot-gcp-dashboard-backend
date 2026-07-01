@@ -53,9 +53,9 @@ fi
 
 ACTIVE_ACCOUNT=$(gcloud auth list --filter=status:ACTIVE --format="value(account)" 2>/dev/null | head -1 || true)
 if [[ -z "$ACTIVE_ACCOUNT" ]]; then
-  printf '\nNot authenticated with gcloud. Log in now? [y/N] '
+  printf '\nNot authenticated with gcloud. Log in now? [Y/n] '
   read -r do_login
-  if [[ "$do_login" =~ ^[Yy]$ ]]; then
+  if [[ -z "$do_login" || "$do_login" =~ ^[Yy]$ ]]; then
     gcloud auth login
     ACTIVE_ACCOUNT=$(gcloud auth list --filter=status:ACTIVE --format="value(account)" 2>/dev/null | head -1 || true)
     [[ -n "$ACTIVE_ACCOUNT" ]] || { printf 'Login did not complete.\n' >&2; exit 1; }
@@ -65,9 +65,9 @@ if [[ -z "$ACTIVE_ACCOUNT" ]]; then
 fi
 
 if ! gcloud auth application-default print-access-token >/dev/null 2>&1; then
-  printf '\nApplication Default Credentials needed for GCP provider. Set up now? [y/N] '
+  printf '\nApplication Default Credentials needed for GCP provider. Set up now? [Y/n] '
   read -r do_adc
-  if [[ "$do_adc" =~ ^[Yy]$ ]]; then
+  if [[ -z "$do_adc" || "$do_adc" =~ ^[Yy]$ ]]; then
     gcloud auth application-default login
   else
     printf 'Run: gcloud auth application-default login\n'; exit 1
@@ -80,9 +80,9 @@ printf '\ngcloud: %s\n' "$ACTIVE_ACCOUNT"
 # You cannot affect anyone else's stack; they cannot affect yours.
 PULUMI_USER=$(pulumi whoami 2>/dev/null || true)
 if [[ -z "$PULUMI_USER" ]]; then
-  printf '\nNot logged in to Pulumi Cloud. Log in now? [y/N] '
+  printf '\nNot logged in to Pulumi Cloud. Log in now? [Y/n] '
   read -r do_pulumi_login
-  if [[ "$do_pulumi_login" =~ ^[Yy]$ ]]; then
+  if [[ -z "$do_pulumi_login" || "$do_pulumi_login" =~ ^[Yy]$ ]]; then
     pulumi login
     PULUMI_USER=$(pulumi whoami 2>/dev/null || true)
     [[ -n "$PULUMI_USER" ]] || { printf 'Pulumi login did not complete.\n' >&2; exit 1; }
@@ -112,18 +112,18 @@ npm install --prefer-offline 2>/dev/null || npm install
 
 # ── stack (isolated per Pulumi user — cannot touch anyone else's) ─────────────
 STACK="dev"
-if ! pulumi stack ls 2>/dev/null | grep -q "^dev "; then
+if ! pulumi stack select "dev" 2>/dev/null; then
   step "creating stack (dev)"
   pulumi stack init "dev"
+  pulumi stack select "dev"
 fi
-pulumi stack select "dev"
 
 pulumi config set gcp:project "$GCP_PROJECT"
 pulumi config set gcp:region  "$GCP_REGION"
 
 # ── up ────────────────────────────────────────────────────────────────────────
 step "pulumi up"
-pulumi up
+pulumi up --yes
 
 # ── write .env.gcp ────────────────────────────────────────────────────────────
 step "writing .env.gcp"

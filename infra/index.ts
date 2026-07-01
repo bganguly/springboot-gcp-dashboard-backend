@@ -10,13 +10,14 @@ const region        = gcpConfig.get("region")       ?? "us-central1";
 const namePrefix    = config.get("namePrefix")       ?? "dash";
 const dbName        = config.get("dbName")           ?? "app";
 const dbUsername    = config.get("dbUsername")       ?? "appuser";
-const dbTier        = config.get("dbTier")           ?? "db-f1-micro";
-const dbDiskGb      = config.getNumber("dbDiskGb")   ?? 20;
+const dbTier        = config.get("dbTier")           ?? "db-custom-4-16384";
+const dbDiskGb      = config.getNumber("dbDiskGb")   ?? 35;
 const backendImage  = config.get("backendImage")     ?? "";
 const frontendImage = config.get("frontendImage")    ?? "";
 
 // ── APIs ──────────────────────────────────────────────────────────────────────
 const apis = [
+  "compute.googleapis.com",
   "sqladmin.googleapis.com",
   "run.googleapis.com",
   "artifactregistry.googleapis.com",
@@ -42,6 +43,13 @@ const subnet = new gcp.compute.Subnetwork("subnet", {
   network: network.id,
 });
 
+const connectorSubnet = new gcp.compute.Subnetwork("connector-subnet", {
+  name: `${namePrefix}-connector-subnet`,
+  ipCidrRange: "10.8.16.0/28",
+  region,
+  network: network.id,
+});
+
 const privateIpRange = new gcp.compute.GlobalAddress("sql-ip-range", {
   name: `${namePrefix}-sql-ip-range`,
   purpose: "VPC_PEERING",
@@ -56,10 +64,18 @@ const privateVpc = new gcp.servicenetworking.Connection("private-vpc", {
   reservedPeeringRanges: [privateIpRange.name],
 }, { dependsOn: apis });
 
+new gcp.compute.Firewall("allow-connector-to-sql", {
+  name: `${namePrefix}-allow-connector-sql`,
+  network: network.id,
+  direction: "INGRESS",
+  sourceRanges: ["10.8.16.0/28"],
+  allows: [{ protocol: "tcp", ports: ["5432"] }],
+});
+
 const connector = new gcp.vpcaccess.Connector("connector", {
   name: `${namePrefix}-connector`,
   region,
-  subnet: { name: subnet.name },
+  subnet: { name: connectorSubnet.name },
   minInstances: 2,
   maxInstances: 3,
 }, { dependsOn: apis });
@@ -81,6 +97,8 @@ const dbInstance = new gcp.sql.DatabaseInstance("pg", {
     ipConfiguration: {
       ipv4Enabled: false,
       privateNetwork: network.id,
+      // Required for Cloud Run Direct VPC Egress to reach Cloud SQL private IP
+      enablePrivatePathForGoogleCloudServices: true,
     },
     databaseFlags: [{ name: "max_connections", value: "200" }],
     backupConfiguration: { enabled: true },
@@ -142,13 +160,23 @@ const backendService = new gcp.cloudrunv2.Service("backend", {
   template: {
     serviceAccount: backendSa.email,
     vpcAccess: {
-      connector: connector.id,
+      networkInterfaces: [{
+        network: network.id,
+        subnetwork: subnet.id,
+      }],
       egress: "PRIVATE_RANGES_ONLY",
     },
     containers: [{
       image: backendImage !== "" ? backendImage : "us-docker.pkg.dev/cloudrun/container/hello",
       ports: [{ containerPort: 8080 }],
       resources: { limits: { cpu: "2", memory: "1Gi" } },
+      startupProbe: {
+        httpGet: { path: "/actuator/health" },
+        initialDelaySeconds: 10,
+        periodSeconds: 15,
+        failureThreshold: 60,  // 60 * 15s = 15 min — covers long Flyway migrations
+        timeoutSeconds: 5,
+      },
       envs: [{
         name: "DATABASE_URL",
         valueSource: {
@@ -181,12 +209,15 @@ const frontendService = new gcp.cloudrunv2.Service("frontend", {
       image: frontendImage !== "" ? frontendImage : "us-docker.pkg.dev/cloudrun/container/hello",
       ports: [{ containerPort: 80 }],
       resources: { limits: { cpu: "1", memory: "512Mi" } },
-      envs: [{ name: "BACKEND_URL", value: backendService.uri }],
+      envs: [{
+        name: "BACKEND_URL",
+        value: backendService.uri,
+      }],
     }],
-    scaling: { minInstanceCount: 1, maxInstanceCount: 3 },
+    scaling: { minInstanceCount: 0, maxInstanceCount: 3 },
   },
   traffics: [{ type: "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST", percent: 100 }],
-}, { dependsOn: [registry] });
+}, { dependsOn: [backendService] });
 
 new gcp.cloudrunv2.ServiceIamMember("frontend-public", {
   project,

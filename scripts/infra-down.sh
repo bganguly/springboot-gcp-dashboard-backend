@@ -9,9 +9,9 @@ PULUMI_USER=$(pulumi whoami 2>/dev/null || true)
 [[ -n "$PULUMI_USER" ]] || { printf 'Not logged in to Pulumi. Run: pulumi login\n' >&2; exit 1; }
 
 printf '\nThis will destroy all GCP resources in your stack (%s/dashboard/dev).\n' "$PULUMI_USER"
-printf 'Proceed? [y/N] '
+printf 'Proceed? [Y/n] '
 read -r yn
-[[ "$yn" =~ ^[Yy]$ ]] || { printf 'Aborted.\n'; exit 0; }
+[[ -z "$yn" || "$yn" =~ ^[Yy]$ ]] || { printf 'Aborted.\n'; exit 0; }
 
 cd "$INFRA_DIR"
 npm install --prefer-offline 2>/dev/null || npm install

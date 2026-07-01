@@ -61,9 +61,9 @@ if [[ -z "$DB_EXISTS" ]]; then
   printf '  3. seed %s orders\n' "$ORDERS"
   printf '  4. rebuild all read model rollups\n'
   printf '\n  Set ORDERS=N to change the seed size (default 100k; production uses 4M).\n'
-  printf '\nProceed? [y/N] '
+  printf '\nProceed? [Y/n] '
   read -r yn
-  [[ "$yn" =~ ^[Yy]$ ]] || { printf 'Aborted.\n'; exit 0; }
+  [[ -z "$yn" || "$yn" =~ ^[Yy]$ ]] || { printf 'Aborted.\n'; exit 0; }
 
   printf '\n[1/4] creating database...\n'
   createdb "$DB"
