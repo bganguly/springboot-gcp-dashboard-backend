@@ -33,18 +33,20 @@ public class AggregateService {
             rows = queryDailySummary(from, to, regionCode);
         } else if (hasQ && isMultiToken && !hasTotal) {
             rows = queryMultiTokenViaCte(from, to, q, status, regionCode);
+            if (rows.isEmpty()) rows = queryViaSearchText(from, to, q, status, regionCode, minTotal, maxTotal);
         } else if (hasQ && isMultiToken) {
-            rows = queryDirectIlike(from, to, q, status, regionCode, minTotal, maxTotal);
+            rows = queryViaSearchText(from, to, q, status, regionCode, minTotal, maxTotal);
         } else if (hasQ && !hasStatus && !hasRegion && !hasTotal) {
             rows = queryTokenRollup(from, to, q);
+            if (rows.isEmpty()) rows = queryViaSearchText(from, to, q, null, null, null, null);
         } else if (hasQ) {
             rows = queryTokenCategorySummary(from, to, q, status, regionCode);
+            if (rows.isEmpty()) rows = queryViaSearchText(from, to, q, status, regionCode, minTotal, maxTotal);
         } else if (hasStatus && !hasRegion && !hasTotal) {
             rows = queryStatusCategorySummary(from, to, status);
         } else if ((hasStatus || hasRegion) && !hasTotal) {
             rows = queryFilterCategorySummary(from, to, status, regionCode);
         } else {
-            // total bounds or complex combo — fall back to order_category_facts
             rows = queryOrderCategoryFacts(from, to, status, regionCode, minTotal, maxTotal);
         }
 
@@ -142,6 +144,42 @@ public class AggregateService {
                 "COUNT(DISTINCT \"orderId\") AS total_orders, SUM(\"totalRevenue\") AS total_revenue, " +
                 "SUM(\"totalItems\") AS total_items FROM order_category_facts " +
                 where + " GROUP BY date, \"categoryName\" ORDER BY date", params);
+    }
+
+    private List<Map<String, Object>> queryViaSearchText(
+            String from, String to, String q,
+            String status, String regionCode,
+            BigDecimal minTotal, BigDecimal maxTotal) {
+        var params = new MapSqlParameterSource().addValue("from", from).addValue("to", to);
+        String[] tokens = q.strip().split("\\s+");
+        List<String> clauses = new ArrayList<>();
+        for (int i = 0; i < tokens.length; i++) {
+            String key = "q" + i;
+            clauses.add("o.search_text ILIKE :" + key);
+            params.addValue(key, "%" + tokens[i] + "%");
+        }
+        if (status != null && !status.isBlank())
+            clauses.add("o.status = ANY(ARRAY[" + quoteStatusList(status) + "])");
+        if (regionCode != null && !regionCode.isBlank())
+            clauses.add("r.code = ANY(ARRAY[" + quoteList(regionCode) + "])");
+        if (minTotal != null) { clauses.add("o.total >= :minTotal"); params.addValue("minTotal", minTotal); }
+        if (maxTotal != null) { clauses.add("o.total <= :maxTotal"); params.addValue("maxTotal", maxTotal); }
+        String where = "WHERE o.\"placedAt\"::date BETWEEN :from::date AND :to::date" +
+                (clauses.isEmpty() ? "" : " AND " + String.join(" AND ", clauses));
+        return jdbc.queryForList(
+                "SELECT o.\"placedAt\"::date::text AS day, cat.name AS category, " +
+                "COUNT(DISTINCT o.id)::bigint AS total_orders, " +
+                "COALESCE(SUM(oi.quantity * oi.\"unitPrice\" * (1 - oi.discount)), 0) AS total_revenue, " +
+                "COALESCE(SUM(oi.quantity), 0)::bigint AS total_items " +
+                "FROM orders o " +
+                "JOIN customers c ON c.id = o.\"customerId\" " +
+                "JOIN regions r ON r.id = o.\"regionId\" " +
+                "JOIN order_items oi ON oi.\"orderId\" = o.id " +
+                "JOIN products p ON p.id = oi.\"productId\" " +
+                "JOIN categories cat ON cat.id = p.\"categoryId\" " +
+                where +
+                " GROUP BY o.\"placedAt\"::date, cat.name ORDER BY o.\"placedAt\"::date",
+                params);
     }
 
     private List<Map<String, Object>> queryMultiTokenViaCte(
