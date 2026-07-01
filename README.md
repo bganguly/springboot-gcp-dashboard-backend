@@ -24,31 +24,19 @@ Checks prerequisites, creates and seeds the database if needed (prompts before a
 
 ## GCP Deploy
 
-### 1. Bring infra up and seed data
+> **When finished:** run `GCP_PROJECT=your-project-id ./scripts/infra-down.sh` to destroy all GCP resources and remove `.env.gcp`.
 
-```bash
-GCP_PROJECT=your-project-id ./scripts/infra-up.sh
-```
-
-Creates Cloud SQL (Postgres 15), Artifact Registry, and Cloud Run, then prompts for how to seed the database:
-
-- **Option 1 — in-region from Cloud Shell** (fastest): prints the exact commands to run in GCP Cloud Shell to avoid local network overhead
-- **Option 2 — full seed** (15–25 min on `db-f1-micro`): runs `prepare-demo-data.sh` directly
-- **Option 3 — skip**: seed manually later with `./scripts/prepare-demo-data.sh`
-
-Set `DEMO_SNAPSHOT_GCS_URI=gs://<bucket>/dash/demo.dump` before running to restore from a snapshot automatically without being prompted.
-
-Safe to rerun. Expected timing: existing healthy infra under 2 minutes; new Cloud SQL instance 5–10 minutes.
-
-### 2. Deploy backend
+### Deploy
 
 ```bash
 ./scripts/deploy.sh
 ```
 
-Detects GCP project, region, and Artifact Registry repo from `gcloud` config (seeded from `.env.gcp` if present). Prompts to confirm or override each, then builds, pushes, and deploys via Terraform. Prints the Cloud Run URL when done.
+Detects GCP project, region, and Artifact Registry repo from `gcloud` config. Prompts to confirm or override, then builds, pushes, and deploys via Terraform. If infra is not yet up, offers to run `infra-up.sh` first (which also handles demo data seeding). Prints the Cloud Run URL and a reminder to tear down when done.
 
-### 3. Start with Cloud SQL Auth Proxy (non-Cloud Run)
+To bring up infra and seed data independently (without deploying): `GCP_PROJECT=your-project-id ./scripts/infra-up.sh`
+
+### Start with Cloud SQL Auth Proxy (non-Cloud Run)
 
 ```bash
 ./scripts/start-dashboard.sh
@@ -56,7 +44,7 @@ Detects GCP project, region, and Artifact Registry repo from `gcloud` config (se
 
 Starts the Cloud SQL Auth Proxy tunnel and the Spring Boot app against it.
 
-### 4. Tear down infra
+### Tear down
 
 ```bash
 GCP_PROJECT=your-project-id ./scripts/infra-down.sh

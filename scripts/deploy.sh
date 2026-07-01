@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+ENV_FILE="$ROOT_DIR/.env.gcp"
+
 # ── helpers ───────────────────────────────────────────────────────────────────
 prompt() {
   local label="$1" default="$2"
@@ -16,17 +18,16 @@ prompt() {
   echo "${input:-$default}"
 }
 
-# ── seed from .env.gcp if present ────────────────────────────────────────────
-[[ -f "$ROOT_DIR/.env.gcp" ]] && source "$ROOT_DIR/.env.gcp"
-
-# ── detect defaults from gcloud ───────────────────────────────────────────────
+# ── detect GCP context ────────────────────────────────────────────────────────
 printf '\n=== detecting GCP context ===\n'
+
+[[ -f "$ENV_FILE" ]] && source "$ENV_FILE"
 
 if command -v gcloud >/dev/null 2>&1; then
   DETECTED_PROJECT=$(gcloud config get-value project 2>/dev/null || true)
   DETECTED_REGION=$(gcloud config get-value compute/region 2>/dev/null || true)
-  DETECTED_REGION="${DETECTED_REGION:-${GCP_REGION:-us-central1}}"
   DETECTED_PROJECT="${DETECTED_PROJECT:-${GCP_PROJECT:-}}"
+  DETECTED_REGION="${DETECTED_REGION:-${GCP_REGION:-us-central1}}"
 
   if [[ -n "$DETECTED_PROJECT" ]]; then
     DETECTED_REGISTRY=$(gcloud artifacts repositories list \
@@ -50,24 +51,35 @@ DETECTED_TAG=$(git -C "$ROOT_DIR" rev-parse --short HEAD 2>/dev/null || date +%Y
 [[ -n "$DETECTED_REGISTRY" ]] && printf '  registry  : %s\n' "$DETECTED_REGISTRY"
 printf '  tag       : %s\n' "$DETECTED_TAG"
 
-# ── prompt for values ─────────────────────────────────────────────────────────
+# ── confirm or override ───────────────────────────────────────────────────────
 printf '\n=== confirm or override ===\n'
 
-GCP_PROJECT=$(prompt "GCP project"      "$DETECTED_PROJECT")
+GCP_PROJECT=$(prompt "GCP project"             "$DETECTED_PROJECT")
 [[ -n "$GCP_PROJECT" ]] || { printf 'GCP project is required.\n' >&2; exit 1; }
 
-GCP_REGION=$(prompt  "region"           "$DETECTED_REGION")
-REGISTRY=$(prompt    "Artifact Registry repo name" "$DETECTED_REGISTRY")
+GCP_REGION=$(prompt  "region"                  "$DETECTED_REGION")
+REGISTRY=$(prompt    "Artifact Registry repo"  "$DETECTED_REGISTRY")
 [[ -n "$REGISTRY" ]] || { printf 'Registry repo name is required.\n' >&2; exit 1; }
 
-TAG=$(prompt         "image tag"        "$DETECTED_TAG")
+TAG=$(prompt         "image tag"               "$DETECTED_TAG")
 
 IMAGE="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT}/${REGISTRY}/backend:${TAG}"
+
+# ── check infra ───────────────────────────────────────────────────────────────
+if [[ ! -f "$ENV_FILE" ]]; then
+  printf '\n.env.gcp not found — infra may not be up.\n'
+  printf 'Run infra-up.sh first? [y/N] '
+  read -r run_infra
+  if [[ "$run_infra" =~ ^[Yy]$ ]]; then
+    GCP_PROJECT="$GCP_PROJECT" GCP_REGION="$GCP_REGION" "$ROOT_DIR/scripts/infra-up.sh"
+    [[ -f "$ENV_FILE" ]] && source "$ENV_FILE"
+  fi
+fi
 
 # ── confirm ───────────────────────────────────────────────────────────────────
 printf '\nWill build and push:\n'
 printf '  %s\n' "$IMAGE"
-printf '\nThen apply Terraform to update Cloud Run (backend) in %s.\n' "$GCP_REGION"
+printf '\nThen apply Terraform to update Cloud Run in %s.\n' "$GCP_REGION"
 printf '\nProceed? [y/N] '
 read -r yn
 [[ "$yn" =~ ^[Yy]$ ]] || { printf 'Aborted.\n'; exit 0; }
@@ -96,3 +108,5 @@ terraform output -raw backend_url 2>/dev/null || \
   gcloud run services describe dashboard-backend \
     --region "$GCP_REGION" --project "$GCP_PROJECT" \
     --format="value(status.url)" 2>/dev/null || true
+
+printf '\n⚠️  Remember to run ./scripts/infra-down.sh when finished to tear down all GCP resources.\n'
