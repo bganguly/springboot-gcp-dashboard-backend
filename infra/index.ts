@@ -174,7 +174,7 @@ const backendService = new gcp.cloudrunv2.Service("backend", {
       ports: [{ containerPort: 8080 }],
       resources: { limits: { cpu: "2", memory: "1Gi" } },
       startupProbe: {
-        httpGet: { path: "/actuator/health" },
+        tcpSocket: { port: 8080 },
         initialDelaySeconds: 10,
         periodSeconds: 15,
         failureThreshold: 60,  // 60 * 15s = 15 min — covers long Flyway migrations
