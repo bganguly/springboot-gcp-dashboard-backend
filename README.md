@@ -69,7 +69,6 @@ pushes to Artifact Registry, runs `pulumi up --yes`. Prints the Cloud Run URL on
 | | URL |
 |---|---|
 | **Backend API** | https://dash-backend-7u2hpcwtmq-uc.a.run.app |
-| **Frontend** | https://dash-frontend-7u2hpcwtmq-uc.a.run.app |
 
 ### Quick test — local
 
