@@ -39,9 +39,11 @@ public class AggregateService {
         } else if (hasQ && !hasStatus && !hasRegion && !hasTotal) {
             rows = queryTokenRollup(from, to, q);
             if (rows.isEmpty()) rows = queryViaSearchText(from, to, q, null, null, null, null);
-        } else if (hasQ) {
+        } else if (hasQ && !hasTotal) {
             rows = queryTokenCategorySummary(from, to, q, status, regionCode);
-            if (rows.isEmpty()) rows = queryViaSearchText(from, to, q, status, regionCode, minTotal, maxTotal);
+            if (rows.isEmpty()) rows = queryViaSearchText(from, to, q, status, regionCode, null, null);
+        } else if (hasQ) {
+            rows = queryViaSearchText(from, to, q, status, regionCode, minTotal, maxTotal);
         } else if (hasStatus && !hasRegion && !hasTotal) {
             rows = queryStatusCategorySummary(from, to, status);
         } else if ((hasStatus || hasRegion) && !hasTotal) {
