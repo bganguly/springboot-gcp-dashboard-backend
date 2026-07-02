@@ -47,24 +47,10 @@ public class OrderService {
         var where = buildWhere(q, status, regionCode, from, to, minTotal, maxTotal, params);
 
         boolean needsRegionJoin = regionCode != null && !regionCode.isBlank();
-        boolean hasFilters = (q != null && !q.isBlank()) || (status != null && !status.isBlank())
-                || needsRegionJoin || (from != null && !from.isBlank()) || (to != null && !to.isBlank())
-                || minTotal != null || maxTotal != null;
-
-        long total;
-        boolean approximate;
-        if (!hasFilters) {
-            // Instant approximation from Postgres statistics — no sequential scan.
-            total = Objects.requireNonNull(jdbc.queryForObject(
-                    "SELECT reltuples::bigint FROM pg_class WHERE relname = 'orders'",
-                    new MapSqlParameterSource(), Long.class));
-            approximate = true;
-        } else {
-            String regionJoin = needsRegionJoin ? "JOIN regions r ON r.id = o.\"regionId\" " : "";
-            String countSql = ctePrefix + "SELECT COUNT(*) FROM orders o " + regionJoin + where;
-            total = Objects.requireNonNull(jdbc.queryForObject(countSql, params, Long.class));
-            approximate = false;
-        }
+        String regionJoin = needsRegionJoin ? "JOIN regions r ON r.id = o.\"regionId\" " : "";
+        String countSql = ctePrefix + "SELECT COUNT(*) FROM orders o " + regionJoin + where;
+        long total = Objects.requireNonNull(jdbc.queryForObject(countSql, params, Long.class));
+        boolean approximate = false;
 
         // Data page
         String orderBy = switch (safeSort) {
